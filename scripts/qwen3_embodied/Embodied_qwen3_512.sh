@@ -1,0 +1,40 @@
+#!/bin/bash
+
+#SBATCH --job-name=Embodied_Evaluation
+#SBATCH --mail-user=josuetf@umich.edu
+#SBATCH --mail-type=ALL
+#SBATCH --output=/nfs/turbo/coe-chaijy-unreplicated/josuetf/slurm/%x_%j.out
+#SBATCH --partition=spgpu
+#SBATCH --time=14-0:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=1
+#SBATCH --gres=gpu:2
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=96GB
+#SBATCH --account=chaijy2
+#SBATCH --chdir=/nfs/turbo/coe-chaijy-unreplicated/josuetf
+#SBATCH --export=DISABLE_VERSION_CHECK=1
+#SBATCH --exclude=gl1527
+
+# run job
+module load cuda/11.8.0
+module load python3.11-anaconda/2024.02
+source activate base
+conda activate vllm
+
+# Debug: Check GPU availability
+echo "=== GPU Configuration ==="
+echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
+nvidia-smi
+python -c "import torch; print(f'PyTorch sees {torch.cuda.device_count()} GPU(s)')"
+echo "========================="
+
+# Explicitly set CUDA devices
+export CUDA_VISIBLE_DEVICES=0,1
+
+python qwen_vl_fewshot_icl_eval_vllm_512.py --model Qwen/Qwen3-VL-4B-Instruct --output qwen3_vl_4b_fewshot_icl_results_4bit_interleaved_vllm_512.jsonl --quantization bitsandbytes --load-in-4bit --tensor-parallel-size 2 --max-num-seqs 32 --max-model-len 50000 --super-batch-per-category --num-examples 1 --log-examples --categories property_damage unsanitary
+python qwen_vl_fewshot_icl_eval_vllm_512.py --model Qwen/Qwen3-VL-4B-Instruct --output qwen3_vl_4b_fewshot_icl_results_4bit_no_metadata_interleaved_512.jsonl --quantization bitsandbytes --load-in-4bit --tensor-parallel-size 2 --max-num-seqs 32 --max-model-len 50000 --no-metadata --super-batch-per-category --num-examples 1 --log-examples --categories property_damage unsanitary
+python qwen_vl_fewshot_icl_eval_vllm_512.py --model Qwen/Qwen3-VL-8B-Instruct --output qwen3_vl_8b_fewshot_icl_results_4bit_interleaved_vllm_512.jsonl --quantization bitsandbytes --load-in-4bit --tensor-parallel-size 2 --max-num-seqs 32 --max-model-len 50000 --super-batch-per-category --num-examples 1 --log-examples --categories property_damage unsanitary
+python qwen_vl_fewshot_icl_eval_vllm_512.py --model Qwen/Qwen3-VL-8B-Instruct --output qwen3_vl_8b_fewshot_icl_results_4bit_no_metadata_interleaved_vllm_512.jsonl --quantization bitsandbytes --load-in-4bit --tensor-parallel-size 2 --max-num-seqs 32 --max-model-len 50000 --no-metadata --super-batch-per-category --num-examples 1 --log-examples --categories property_damage unsanitary
+python qwen_vl_fewshot_icl_eval_vllm_512.py --model Qwen/Qwen3-VL-32B-Instruct --output qwen3_vl_32b_fewshot_icl_results_4bit_interleaved_vllm_512.jsonl --quantization bitsandbytes --load-in-4bit --tensor-parallel-size 2 --max-num-seqs 32 --max-model-len 50000 --super-batch-per-category --num-examples 1 --log-examples --categories property_damage unsanitary
+python qwen_vl_fewshot_icl_eval_vllm_512.py --model Qwen/Qwen3-VL-32B-Instruct --output qwen3_vl_32b_fewshot_icl_results_4bit_no_metadata_interleaved_vllm_512.jsonl --quantization bitsandbytes --load-in-4bit --tensor-parallel-size 2 --max-num-seqs 32 --max-model-len 50000 --no-metadata --super-batch-per-category --num-examples 1 --log-examples --categories property_damage unsanitary
