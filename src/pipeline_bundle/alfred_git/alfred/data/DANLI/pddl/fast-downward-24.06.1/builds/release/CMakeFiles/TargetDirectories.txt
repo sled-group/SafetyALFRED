@@ -1,6 +1,0 @@
-/home/josue/Desktop/Research/SLED/MSS/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/CMakeFiles/translate.dir
-/home/josue/Desktop/Research/SLED/MSS/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/CMakeFiles/edit_cache.dir
-/home/josue/Desktop/Research/SLED/MSS/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/CMakeFiles/rebuild_cache.dir
-/home/josue/Desktop/Research/SLED/MSS/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/search/CMakeFiles/downward.dir
-/home/josue/Desktop/Research/SLED/MSS/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/search/CMakeFiles/edit_cache.dir
-/home/josue/Desktop/Research/SLED/MSS/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/search/CMakeFiles/rebuild_cache.dir
