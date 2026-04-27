@@ -210,3 +210,4 @@ clean_results/**/*.jsonl
 clean_results/*.txt
 clean_results/
 evaluation_results/
+src/pipeline_bundle/alfred_git/alfred/data/DANLI/pddl/fast-downward-24.06.1/builds/release/bin/downward
