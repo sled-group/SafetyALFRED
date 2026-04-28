@@ -29,16 +29,25 @@ from termcolor import colored
 # Resolve bundle root: this script lives at <BUNDLE>/alfred/gen/.
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BUNDLE_ROOT = os.path.abspath(os.path.join(_THIS_DIR, '..', '..'))
+_BUNDLED_ET_ROOT = os.path.join(_BUNDLE_ROOT, 'E.T.')
+
+# Use the caller's ET_ROOT when it is already configured; otherwise fall back
+# to the bundled checkout root.
+os.environ.setdefault('ET_ROOT', _BUNDLED_ET_ROOT)
+os.environ.setdefault('ET_DATA', '/tmp/safetyalfred_et_data')
+os.environ.setdefault('ET_LOGS', '/tmp/safetyalfred_et_logs')
+os.makedirs(os.environ['ET_DATA'], exist_ok=True)
+os.makedirs(os.environ['ET_LOGS'], exist_ok=True)
 
 # Add ALFRED paths
 sys.path.append(os.path.join(os.environ.get('ALFRED_ROOT', '.'), 'gen'))
 
 # Add E.T. gen directory for imports (bundled copy)
-et_gen_dir = os.path.join(_BUNDLE_ROOT, 'E.T.', 'alfred', 'gen')
+et_gen_dir = os.path.join(_BUNDLED_ET_ROOT, 'alfred', 'gen')
 sys.path.insert(0, et_gen_dir)
 sys.path.insert(0, _THIS_DIR)
 # Make the bundled E.T./alfred package importable as `alfred.*`
-sys.path.insert(0, os.path.join(_BUNDLE_ROOT, 'E.T.'))
+sys.path.insert(0, _BUNDLED_ET_ROOT)
 
 from alfred.env.thor_env_thor5 import ThorEnv
 from alfred.gen import constants
@@ -445,7 +454,7 @@ def run_complete_pipeline(
                 alias='ff-astar',
                 timeout=60
             )
-            plan, runtime = planner.plan(domain_path, problem_pddl_path, debug=False)
+            plan, runtime = planner.plan(domain_path, problem_pddl_path, debug=True)
 
             if plan is None:
                 print(colored("  ✗ Failed to generate plan", 'red'))
