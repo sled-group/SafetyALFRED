@@ -41,16 +41,16 @@ from termcolor import colored
 _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BUNDLE_ROOT = os.path.abspath(os.path.join(_THIS_DIR, '..', '..'))
 sys.path.append(os.path.join(os.environ.get('ALFRED_ROOT', '.'), 'gen'))
-ET_GEN_DIR = os.path.join(_BUNDLE_ROOT, 'E.T.', 'alfred', 'gen')
+ET_GEN_DIR = os.path.join(_BUNDLE_ROOT, 'E.T.', 'gen')
 sys.path.insert(0, ET_GEN_DIR)
 sys.path.insert(0, _THIS_DIR)
-# Make the bundled `E.T./alfred` package importable as `alfred.*`.
+# Make the bundled E.T. packages importable as top-level (`env.*`, `gen.*`, ...).
 sys.path.insert(0, os.path.join(_BUNDLE_ROOT, 'E.T.'))
 
-from alfred.env.thor_env_thor5 import ThorEnv
-from alfred.gen import constants
-from alfred.gen.utils import video_util, game_util  # noqa: F401
-from alfred.gen.graph.graph_obj import Graph
+from env.thor_env_thor5 import ThorEnv
+from gen import constants
+from gen.utils import video_util, game_util  # noqa: F401
+from gen.graph.graph_obj import Graph
 from safety_initialization import initialize_safety_hazard_scene
 from render_plan_with_navigation import save_frame, add_delay_frames
 

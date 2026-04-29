@@ -10,8 +10,6 @@ This script takes an ALFRED trajectory and:
 5. Renders with smooth navigation and time delays
 
 IMPORTANT: This pipeline uses AI2-THOR 5.0 actions for safety hazard object placement.
-           Use the modern virtual environment:
-           source /home/josue/Desktop/Research/SLED/MSS/E.T./et_env_safety_modern/bin/activate
 
 Usage:
     python pipeline_pddl_to_video_thor5.py --traj_json <path> --output_dir <path>
@@ -31,8 +29,8 @@ _THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 _BUNDLE_ROOT = os.path.abspath(os.path.join(_THIS_DIR, '..', '..'))
 _BUNDLED_ET_ROOT = os.path.join(_BUNDLE_ROOT, 'E.T.')
 
-# Use the caller's ET_ROOT when it is already configured; otherwise fall back
-# to the bundled checkout root.
+# # Use the caller's ET_ROOT when it is already configured; otherwise fall back
+# # to the bundled checkout root.
 os.environ.setdefault('ET_ROOT', _BUNDLED_ET_ROOT)
 os.environ.setdefault('ET_DATA', '/tmp/safetyalfred_et_data')
 os.environ.setdefault('ET_LOGS', '/tmp/safetyalfred_et_logs')
@@ -43,16 +41,16 @@ os.makedirs(os.environ['ET_LOGS'], exist_ok=True)
 sys.path.append(os.path.join(os.environ.get('ALFRED_ROOT', '.'), 'gen'))
 
 # Add E.T. gen directory for imports (bundled copy)
-et_gen_dir = os.path.join(_BUNDLED_ET_ROOT, 'alfred', 'gen')
+et_gen_dir = os.path.join(_BUNDLED_ET_ROOT, 'gen')
 sys.path.insert(0, et_gen_dir)
 sys.path.insert(0, _THIS_DIR)
-# Make the bundled E.T./alfred package importable as `alfred.*`
+# Make the bundled E.T. packages importable as top-level (`env.*`, `gen.*`, ...)
 sys.path.insert(0, _BUNDLED_ET_ROOT)
 
-from alfred.env.thor_env_thor5 import ThorEnv
-from alfred.gen import constants
-from alfred.gen.utils import video_util, game_util, augment_util
-from alfred.gen.graph.graph_obj import Graph
+from env.thor_env_thor5 import ThorEnv
+from gen import constants
+from gen.utils import video_util, game_util, augment_util
+from gen.graph.graph_obj import Graph
 from generate_problem_pddl_full_thor5 import generate_pddl_from_traj_full
 from safety_initialization import initialize_safety_hazard_scene
 
@@ -164,6 +162,13 @@ def run_complete_pipeline(
         dict: Results with paths to all outputs
     """
 
+    if os.path.exists(output_dir) and not os.access(output_dir, os.W_OK):
+        user_suffix = os.environ.get('USER', 'default')
+        fallback_dir = f"{output_dir.rstrip('/')}_{user_suffix}"
+        print(colored(
+            f"  ! {output_dir} exists but is not writable; using {fallback_dir} instead",
+            'yellow'))
+        output_dir = fallback_dir
     os.makedirs(output_dir, exist_ok=True)
 
     # Handle alternative cabinet: create modified trajectory file with replaced cabinet IDs
@@ -191,10 +196,10 @@ def run_complete_pipeline(
                 # Load openable.json to find alternative cabinets
                 floor_plan = f"FloorPlan{scene_num}"
                 # Get the absolute path to layouts directory
-                # pipeline is at MSS/alfred/gen/, we need MSS/E.T./alfred/gen/layouts/
+                # pipeline is at MSS/alfred/gen/, we need MSS/E.T./gen/layouts/
                 script_dir = os.path.dirname(os.path.abspath(__file__))
                 mss_dir = os.path.dirname(os.path.dirname(script_dir))  # Go up to MSS directory
-                layouts_dir = os.path.join(mss_dir, 'E.T.', 'alfred', 'gen', 'layouts')
+                layouts_dir = os.path.join(mss_dir, 'E.T.', 'gen', 'layouts')
                 openable_json_path = os.path.join(layouts_dir, f'{floor_plan}-openable.json')
 
                 if os.path.exists(openable_json_path):
@@ -924,6 +929,80 @@ def run_complete_pipeline(
                         thor_action['x'] = new_x
                         thor_action['z'] = new_z
 
+                # Before PutObject, teleport to a reachable point next to the receptacle
+                if thor_action['action'] == 'PutObject' and use_teleport:
+                    receptacle_id = thor_action.get('receptacleObjectId')
+                    if receptacle_id:
+                        objects_meta = {obj['objectId']: obj for obj in env.last_event.metadata['objects']}
+                        receptacle_obj = objects_meta.get(receptacle_id)
+                        if receptacle_obj:
+                            recept_pos = receptacle_obj['position']
+                            agent_y = env.last_event.metadata['agent']['position']['y']
+
+                            best_point = None
+                            best_dist = float('inf')
+                            for point in nav_graph.points:
+                                px = point[0] * constants.AGENT_STEP_SIZE
+                                pz = point[1] * constants.AGENT_STEP_SIZE
+                                d = (px - recept_pos['x']) ** 2 + (pz - recept_pos['z']) ** 2
+                                if d < best_dist:
+                                    best_dist = d
+                                    best_point = (px, pz)
+
+                            if best_point is not None:
+                                place_x, place_z = best_point
+
+                                if is_spoilage and fridge_position:
+                                    place_x, place_z, _ = find_position_away_from_fridge(
+                                        place_x, place_z, fridge_position, nav_graph, min_distance=0.5
+                                    )
+
+                                dx = recept_pos['x'] - place_x
+                                dz = recept_pos['z'] - place_z
+                                rotation_deg = np.degrees(np.arctan2(dx, dz))
+                                if rotation_deg < 0:
+                                    rotation_deg += 360
+
+                                horizontal_dist = np.sqrt(dx ** 2 + dz ** 2)
+                                vertical_dist = recept_pos['y'] - (agent_y + 0.675)
+                                if horizontal_dist > 0.01:
+                                    horizon_deg = float(np.clip(
+                                        np.degrees(np.arctan2(-vertical_dist, horizontal_dist)),
+                                        -30, 60))
+                                else:
+                                    horizon_deg = 0.0
+
+                                pre_put_teleport = {
+                                    'action': 'TeleportFull',
+                                    'x': float(place_x),
+                                    'y': agent_y,
+                                    'z': float(place_z),
+                                    'rotation': {'x': 0, 'y': float(rotation_deg), 'z': 0},
+                                    'horizon': horizon_deg,
+                                    'standing': True,
+                                }
+                                pre_event = env.step(pre_put_teleport)
+                                if pre_event.metadata['lastActionSuccess']:
+                                    print(colored(
+                                        f"\n      → Pre-PutObject teleport to {receptacle_id.split('|')[0]}",
+                                        'cyan'), end='')
+                                    save_frame(env, execution_dir, frame_idx)
+                                    frame_idx += 1
+                                    # Record so convert_plan_to_traj emits this teleport
+                                    # into the converted trajectory (and thus the final render)
+                                    low_level_results.append({
+                                        'action': 'TeleportFull',
+                                        'action_type': 'pre_put_teleport',
+                                        'target_object': receptacle_id,
+                                        'success': True,
+                                        'thor_action': pre_put_teleport,
+                                    })
+                                else:
+                                    err = pre_event.metadata.get('errorMessage', '')[:80]
+                                    print(colored(
+                                        f"\n      ⚠ Pre-PutObject teleport failed: {err}",
+                                        'yellow'), end='')
+
                 # Execute the action
                 event = env.step(thor_action)
 
@@ -1019,31 +1098,17 @@ def run_complete_pipeline(
 
                 low_level_results.append(action_result)
 
-                # After successful manipulation actions, teleport to look directly at the interacted object
-                manipulation_actions = ['PickupObject', 'PutObject', 'OpenObject', 'CloseObject',
-                                       'ToggleObjectOn', 'ToggleObjectOff', 'SliceObject']
+                # Post-manipulation "look at object" teleport disabled for all actions.
+                manipulation_actions = []
                 if thor_action['action'] in manipulation_actions and event.metadata['lastActionSuccess'] and use_teleport:
                     # Determine the target object to look at
                     target_obj_id = None
                     target_obj_pos = None
 
                     if thor_action['action'] == 'PutObject':
-                        # For PutObject, look at the receptacle where the object was placed
-                        receptacle_id = thor_action.get('receptacleObjectId')
-                        placed_obj_id = thor_action.get('objectId')
-
-                        if receptacle_id:
-                            objects = {obj['objectId']: obj for obj in event.metadata['objects']}
-                            receptacle_obj = objects.get(receptacle_id)
-                            placed_obj = objects.get(placed_obj_id)
-
-                            if receptacle_obj and placed_obj:
-                                # Use the placed object's position (inside the receptacle)
-                                target_obj_id = placed_obj_id
-                                target_obj_pos = placed_obj['position']
-                            elif receptacle_obj:
-                                target_obj_id = receptacle_id
-                                target_obj_pos = receptacle_obj['position']
+                        # Disabled: agent already teleported next to the receptacle
+                        # before placing the object, so no post-place look-at is needed.
+                        pass
 
                     elif thor_action['action'] == 'PickupObject':
                         # For PickupObject, look at where the object was (now in hand)
