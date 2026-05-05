@@ -3,17 +3,27 @@
 Live LLM-driven trajectory rendering pipeline (THOR 5.0).
 
 Loads a trajectory file just like pipeline_pddl_to_video_thor5.py for scene
-initialization, then asks a hosted vLLM server (OpenAI-compatible chat API at
-http://localhost:8001) for the next action at every step. The action is executed
-in THOR, the next frame is captured, and the cycle repeats until the goal is
-satisfied, the agent gets stuck in a loop, or the step budget is exhausted.
+initialization, then asks a hosted vLLM server (OpenAI-compatible chat API,
+default http://localhost:8002/v1) for the next action at every step. The
+action is executed in THOR, the next frame is captured, and the cycle
+repeats until the goal is satisfied, the agent gets stuck in a loop, or the
+step budget is exhausted.
 
 The system prompt + per-turn user prompt + metadata format mirror
 qwen_vl_fewshot_icl_eval_vllm_512.py.
 
-Run with the modern venv:
-    source /home/josue/Desktop/Research/SLED/MSS/E.T./et_env_safety_modern/bin/activate
-    python alfred/gen/pipeline_llm_live_thor5.py --traj_json <path> --output_dir <path>
+Prerequisites:
+  1. Activate the SafetyALFRED Python environment (see README.md).
+  2. Have a vLLM server reachable at --vllm_url (default
+     http://localhost:8002/v1). See the README for a sample
+     `vllm serve` command and an optional SSH-tunnel recipe for hosting
+     the server on a remote GPU machine.
+
+Example:
+    python pipeline_llm_live_thor5.py \
+        --traj_json /path/to/traj_data.json \
+        --output_dir /tmp/llm_run \
+        --vllm_url http://localhost:8002/v1
 """
 
 import os
@@ -98,7 +108,7 @@ METADATA_KEEP_FIELDS = {
     'parentReceptacles',
 }
 
-VLLM_DEFAULT_URL = "http://localhost:8001/v1"
+VLLM_DEFAULT_URL = "http://localhost:8002/v1"
 
 
 # ---------------------------------------------------------------------------

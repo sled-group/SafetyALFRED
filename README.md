@@ -1,6 +1,13 @@
 # SafetyALFRED
 Code for SafetyALFRED paper published at the 2026 Findings of the Association for Computational Linguistics.
 
+### Cloning the Repository
+
+```
+git clone https://github.com/sled-group/SafetyALFRED.git
+cd SafetyALFRED
+```
+
 ### Making a Conda Environment 
 
 We recommend using [conda](https://www.anaconda.com/docs/getting-started/miniconda/main) and creating a virtual environment.
@@ -36,3 +43,72 @@ export PYTHONPATH=$PYTHONPATH:$ET_ROOT
 ```
 python pipeline_pddl_to_video_thor5.py --traj_json {/path/to/traj_data.json} --output_dir /tmp/test --use_teleport --no_time_delays --no_smooth_nav --clear_microwave_objects --clear_sink_objects
 ```
+
+### Running the Live LLM-Driven Pipeline
+
+`src/pipeline_bundle/alfred/gen/pipeline_llm_live_thor5.py` runs a closed-loop
+agent: it initializes a SafetyALFRED scene from a trajectory file, then queries
+a hosted vision-language model over an OpenAI-compatible HTTP API for the next
+action at every step. Any vLLM-served chat model with image input will work; we
+have tested it with `Qwen/Qwen3-VL-32B-Instruct`.
+
+#### Step 1: Start a vLLM server
+
+On a machine with a CUDA-capable GPU, install
+[vLLM](https://docs.vllm.ai/en/latest/getting_started/installation.html) into a
+separate Python environment and launch a server. For example, to serve
+`Qwen/Qwen3-VL-32B-Instruct` on port `8002`:
+
+```
+CUDA_VISIBLE_DEVICES=0 vllm serve Qwen/Qwen3-VL-32B-Instruct \
+    --quantization bitsandbytes \
+    --port 8002 \
+    --max-model-len 50000 \
+    --max-num-seqs 32
+```
+
+Adjust `CUDA_VISIBLE_DEVICES`, the model name, and `--quantization` /
+`--max-model-len` / `--max-num-seqs` to match your hardware. Confirm the server
+is up with `curl http://localhost:8002/v1/models`.
+
+#### Step 2 (optional): Forward the server from a remote GPU machine
+
+If the vLLM server is running on a remote cluster, open an SSH tunnel from your
+local machine so the pipeline can talk to it as if it were on `localhost`. The
+generic form is:
+
+```
+ssh -J <jump_user>@<jump_host> -N -f \
+    -L <local_port>:<gpu_node>:<remote_port> \
+    <user>@<login_host>
+```
+
+For example, forwarding port `8002` on the GPU node `gpu-node-01` through a
+login host that requires going through a jump host:
+
+```
+ssh -J myuser@jumphost.example.edu -N -f \
+    -L 8002:gpu-node-01:8002 \
+    myuser@cluster.example.edu
+```
+
+Drop the `-J <jump_user>@<jump_host>` flag if no jump host is needed. After the
+tunnel is up, the pipeline reaches the remote vLLM server at
+`http://localhost:8002/v1`.
+
+#### Step 3: Run the pipeline
+
+With the SafetyALFRED conda environment activated and the environment variables
+from above exported, run:
+
+```
+python src/pipeline_bundle/alfred/gen/pipeline_llm_live_thor5.py \
+    --traj_json {/path/to/traj_data.json} \
+    --output_dir /tmp/llm_run \
+    --vllm_url http://localhost:8002/v1
+```
+
+The script writes per-step frames, an annotated `llm_run.mp4`, and a
+`llm_run.json` log into `--output_dir`. Use `--help` to see the full list of
+flags (max steps, temperature, vision-only mode, strict GoTo, frame timing,
+etc.).

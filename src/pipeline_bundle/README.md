@@ -95,6 +95,8 @@ Useful flags (full list via `--help`):
 
 ## Running the live LLM-driven pipeline
 
+Make a conda environment with python 3.7 and run `pip install -r requirements.txt`
+
 `pipeline_llm_live_thor5.py` ignores PDDL planning entirely. It uses the same scene-init code path (so it starts from a real ALFRED trajectory file) but then queries a hosted vLLM server (OpenAI-compatible chat API) for the next action every step until the goal is verified, the agent is stuck in a loop, or the step budget is exhausted. Each successful THOR step becomes one labeled frame in the output video.
 
 Extra requirements over the PDDL pipeline:
